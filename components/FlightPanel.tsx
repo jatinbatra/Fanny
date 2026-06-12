@@ -15,7 +15,7 @@ interface Props {
   onUntrack: (icao24: string) => void;
   onSelectFlight: (flight: Flight | null) => void;
   selectedFlight: Flight | null;
-  dataSource: "live" | "simulated";
+  dataSource: "live" | "mixed" | "simulated";
   flightCount: number;
   turbZoneCount: number;
 }
@@ -74,9 +74,9 @@ export default function FlightPanel({
         <div className="flex items-center gap-2 mb-2">
           <div className="w-2 h-2 rounded-full bg-[#00ff88] animate-pulse" />
           <span className="text-[#00ff88] text-xs uppercase tracking-widest">Live Radar</span>
-          {dataSource === "simulated" && (
+          {dataSource !== "live" && (
             <span className="ml-auto text-[10px] text-amber-500 border border-amber-800 px-1.5 rounded">
-              DEMO DATA
+              {dataSource === "simulated" ? "DEMO DATA" : "PARTIAL"}
             </span>
           )}
         </div>

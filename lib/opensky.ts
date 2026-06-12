@@ -13,9 +13,13 @@ export async function fetchFlights(
       url += `?lamin=${bbox.minLat}&lamax=${bbox.maxLat}&lomin=${bbox.minLon}&lomax=${bbox.maxLon}`;
     }
 
+    // Fail fast: anonymous OpenSky is slow and aggressively rate-limited.
+    // If it can't answer in 6s the route falls back to simulated data
+    // instead of leaving the user staring at an empty map.
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
-      next: { revalidate: 15 },
+      signal: AbortSignal.timeout(6000),
+      next: { revalidate: 30 },
     });
 
     if (!res.ok) throw new Error(`OpenSky API ${res.status}`);

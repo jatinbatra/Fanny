@@ -24,7 +24,7 @@ const RadarMap = dynamic(() => import("./RadarMap"), {
   ),
 });
 
-const REFRESH_INTERVAL = 15000; // 15 seconds
+const REFRESH_INTERVAL = 30000; // 30s — respects OpenSky anonymous rate limits
 
 export default function TurbulenceRadar() {
   const [flights, setFlights] = useState<Flight[]>([]);
@@ -33,7 +33,7 @@ export default function TurbulenceRadar() {
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
-  const [dataSource, setDataSource] = useState<"live" | "simulated">("simulated");
+  const [dataSource, setDataSource] = useState<"live" | "mixed" | "simulated">("simulated");
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -192,9 +192,11 @@ export default function TurbulenceRadar() {
         )}
 
         <div className="ml-auto flex items-center gap-3">
-          {dataSource === "simulated" && (
-            <span className="text-[10px] font-mono text-amber-500 border border-amber-800 px-2 py-0.5 rounded">
-              DEMO MODE — Live data unavailable
+          {dataSource !== "live" && (
+            <span className="hidden sm:inline text-[10px] font-mono text-amber-500 border border-amber-800 px-2 py-0.5 rounded">
+              {dataSource === "simulated"
+                ? "DEMO MODE — live feeds unreachable"
+                : "PARTIAL LIVE — some data simulated"}
             </span>
           )}
           <button
@@ -208,10 +210,10 @@ export default function TurbulenceRadar() {
         </div>
       </header>
 
-      {/* Main layout */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* Main layout — stacked on mobile, side-by-side on desktop */}
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         {/* Map area */}
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1 relative overflow-hidden min-h-[45vh]">
           <RadarMap
             flights={flights}
             turbulenceZones={turbulenceZones}
@@ -248,8 +250,8 @@ export default function TurbulenceRadar() {
           )}
         </div>
 
-        {/* Right panel */}
-        <div className="w-80 shrink-0 flex flex-col">
+        {/* Right panel (bottom sheet on mobile) */}
+        <div className="w-full md:w-80 shrink-0 flex flex-col h-[40vh] md:h-auto">
           <FlightPanel
             turbulentFlights={turbulentFlights}
             allTurbulenceZones={turbulenceZones}
