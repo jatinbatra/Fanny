@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+@source "../components/**/*.{ts,tsx}";
+@source "../app/**/*.{ts,tsx}";
+
+@theme {
+  --color-radar-bg: #0a0e1a;
+  --color-radar-panel: #0d1525;
+  --color-radar-border: #1e2d4a;
+  --color-radar-accent: #00d4ff;
+  --color-radar-warning: #ff8c00;
+  --color-radar-danger: #ff3366;
+  --color-radar-safe: #00ff88;
+}
+
+:root {
+  --radar-bg: #0a0e1a;
+  --radar-panel: #0d1525;
+  --radar-border: #1e2d4a;
+  --radar-accent: #00d4ff;
+  --radar-warning: #ff8c00;
+  --radar-danger: #ff3366;
+  --radar-safe: #00ff88;
+}
+
+body {
+  background-color: var(--radar-bg);
+  color: #e2e8f0;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  background: #0a0e1a !important;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.leaflet-tile-pane {
+  filter: brightness(0.7) saturate(0.5) hue-rotate(180deg) invert(0.15);
+}
+
+.leaflet-popup-content-wrapper {
+  background: #0d1525 !important;
+  border: 1px solid #1e2d4a !important;
+  border-radius: 8px !important;
+  color: #e2e8f0 !important;
+}
+
+.leaflet-popup-tip {
+  background: #0d1525 !important;
+}
+
+.leaflet-popup-close-button {
+  color: #00d4ff !important;
+}
+
+/* Radar sweep animation */
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s ease-out;
+}
+
+.radar-sweep {
+  animation: radar-sweep 4s linear infinite;
+  transform-origin: center;
+}
+
+.pulse-ring {
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0d1525;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e2d4a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00d4ff44;
+}
+
+/* Turbulence severity badges */
+.turb-light {
+  background: rgba(255, 200, 0, 0.15);
+  border: 1px solid #ffc800;
+  color: #ffc800;
+}
+.turb-moderate {
+  background: rgba(255, 140, 0, 0.15);
+  border: 1px solid #ff8c00;
+  color: #ff8c00;
+}
+.turb-severe {
+  background: rgba(255, 51, 102, 0.15);
+  border: 1px solid #ff3366;
+  color: #ff3366;
+}
+.turb-extreme {
+  background: rgba(180, 0, 60, 0.3);
+  border: 1px solid #ff0044;
+  color: #ff6688;
+}
