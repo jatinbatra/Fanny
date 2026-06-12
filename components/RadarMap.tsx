@@ -188,34 +188,33 @@ export default function RadarMap({
           </div>`,
         });
 
+        const altFt = Math.round(flight.altitude * 3.28084);
+        const speedKts = Math.round(flight.velocity * 1.94384);
+        const turbInfo = flight.turbulence
+          ? `<br/><b style="color:${color}">⚠ ${flight.turbulence.severity.toUpperCase()} TURBULENCE</b>`
+          : "";
+        const popupHtml = `<div style="font-family:monospace;font-size:12px;line-height:1.8;min-width:180px">
+            <b style="color:#00d4ff;font-size:14px">${flight.callsign}</b>
+            <span style="color:#64748b;font-size:10px"> ${flight.icao24}</span>
+            ${turbInfo}
+            <hr style="border-color:#1e2d4a;margin:6px 0"/>
+            <span style="color:#94a3b8">Origin:</span> ${flight.originCountry}<br/>
+            <span style="color:#94a3b8">Altitude:</span> FL${Math.round(altFt / 100)}<br/>
+            <span style="color:#94a3b8">Speed:</span> ${speedKts} kts<br/>
+            <span style="color:#94a3b8">Heading:</span> ${Math.round(flight.trueTrack)}°<br/>
+            <span style="color:#94a3b8">V/S:</span> ${Math.round(flight.verticalRate * 196.85)} ft/min
+          </div>`;
+
         if (markersRef.current.has(flight.icao24)) {
           const existing = markersRef.current.get(flight.icao24)!;
           existing.setLatLng([flight.latitude, flight.longitude]);
           existing.setIcon(icon);
+          existing.setPopupContent(popupHtml);
+          existing.off("click");
+          existing.on("click", () => onFlightSelect(flight));
         } else {
           const marker = L.marker([flight.latitude, flight.longitude], { icon });
-
-          const altFt = Math.round(flight.altitude * 3.28084);
-          const speedKts = Math.round(flight.velocity * 1.94384);
-          const turbInfo = flight.turbulence
-            ? `<br/><b style="color:${color}">⚠ ${flight.turbulence.severity.toUpperCase()} TURBULENCE</b>`
-            : "";
-
-          marker.bindPopup(
-            `<div style="font-family:monospace;font-size:12px;line-height:1.8;min-width:180px">
-              <b style="color:#00d4ff;font-size:14px">${flight.callsign}</b>
-              <span style="color:#64748b;font-size:10px"> ${flight.icao24}</span>
-              ${turbInfo}
-              <hr style="border-color:#1e2d4a;margin:6px 0"/>
-              <span style="color:#94a3b8">Origin:</span> ${flight.originCountry}<br/>
-              <span style="color:#94a3b8">Altitude:</span> FL${Math.round(altFt / 100)}<br/>
-              <span style="color:#94a3b8">Speed:</span> ${speedKts} kts<br/>
-              <span style="color:#94a3b8">Heading:</span> ${Math.round(flight.trueTrack)}°<br/>
-              <span style="color:#94a3b8">V/S:</span> ${Math.round(flight.verticalRate * 196.85)} ft/min
-            </div>`,
-            { maxWidth: 240 }
-          );
-
+          marker.bindPopup(popupHtml, { maxWidth: 240 });
           marker.on("click", () => onFlightSelect(flight));
           marker.addTo(flightLayerRef.current!);
           markersRef.current.set(flight.icao24, marker);
