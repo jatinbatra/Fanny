@@ -1,47 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchFlights, haversineNm } from "@/lib/opensky";
-import { fetchTurbulencePIREPs } from "@/lib/aviation-weather";
+import { fetchRealFlights, haversineNm, Viewport } from "@/lib/adsb";
+import {
+  fetchPirepTurbulence,
+  fetchJetStreamTurbulence,
+} from "@/lib/turbulence";
 import { simulatedZones, simulatedFlights } from "@/lib/simulated";
 import { Flight, TurbulenceEvent } from "@/lib/types";
 
 export const runtime = "edge";
-export const revalidate = 30;
+export const revalidate = 20;
 
-// Cap what we send to the client — rendering thousands of markers
-// freezes mobile browsers, and the panel only needs the interesting ones.
-const MAX_FLIGHTS = 400;
+// Rendering thousands of markers freezes mobile browsers; the radar only
+// needs the interesting traffic.
+const MAX_FLIGHTS = 500;
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const minLat = searchParams.get("minLat");
-  const maxLat = searchParams.get("maxLat");
-  const minLon = searchParams.get("minLon");
-  const maxLon = searchParams.get("maxLon");
 
-  const bbox =
-    minLat && maxLat && minLon && maxLon
-      ? {
-          minLat: Number(minLat),
-          maxLat: Number(maxLat),
-          minLon: Number(minLon),
-          maxLon: Number(maxLon),
-        }
-      : undefined;
+  // Viewport from the client map (centre + radius). Falls back to a busy
+  // default region so the very first paint still shows real traffic.
+  const view: Viewport = {
+    lat: num(searchParams.get("lat"), 50.5),
+    lon: num(searchParams.get("lon"), 6.0),
+    distNm: num(searchParams.get("dist"), 220),
+  };
 
-  const [liveFlights, pirepZones] = await Promise.all([
-    fetchFlights(bbox),
-    fetchTurbulencePIREPs(),
+  const [realFlights, pireps, jet] = await Promise.all([
+    fetchRealFlights(view),
+    fetchPirepTurbulence(),
+    fetchJetStreamTurbulence(view),
   ]);
 
-  const flightsLive = liveFlights.length > 0;
-  const zonesLive = pirepZones.length > 0;
+  const flightsLive = realFlights.length > 0;
 
-  const turbulenceZones: TurbulenceEvent[] = zonesLive
-    ? pirepZones
-    : simulatedZones();
-  const rawFlights = flightsLive ? liveFlights : simulatedFlights();
+  // Real turbulence = pilot reports + jet-stream CAT zones. Only synthesise
+  // zones if BOTH real sources came back empty.
+  let turbulenceZones: TurbulenceEvent[] = [...pireps, ...jet];
+  const turbLive = turbulenceZones.length > 0;
+  if (!turbLive) turbulenceZones = simulatedZones();
 
-  // Annotate flights that are inside a turbulence zone
+  const rawFlights = flightsLive ? realFlights : simulatedFlights();
+
+  // Annotate flights inside a turbulence zone (within ~6000 ft vertically).
   const annotated: Flight[] = rawFlights.map((flight) => {
     const altFt = flight.altitude * 3.28084;
     const match = turbulenceZones.find((zone) => {
@@ -52,24 +52,36 @@ export async function GET(req: NextRequest) {
     return match ? { ...flight, turbulence: match } : flight;
   });
 
-  // Turbulent flights always make the cut; fill the rest up to the cap
+  // Turbulent flights always survive the cap.
   const turbulent = annotated.filter((f) => f.turbulence);
   const calm = annotated.filter((f) => !f.turbulence);
-  const flights = [...turbulent, ...calm.slice(0, Math.max(0, MAX_FLIGHTS - turbulent.length))];
+  const flights = [
+    ...turbulent,
+    ...calm.slice(0, Math.max(0, MAX_FLIGHTS - turbulent.length)),
+  ];
+
+  const source =
+    flightsLive && turbLive ? "live" : flightsLive || turbLive ? "mixed" : "simulated";
 
   return NextResponse.json(
     {
       flights,
       turbulenceZones,
-      source: flightsLive && zonesLive ? "live" : flightsLive || zonesLive ? "mixed" : "simulated",
+      source,
       flightsLive,
-      zonesLive,
+      turbLive,
       totalFlights: annotated.length,
     },
     {
       headers: {
-        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+        "Cache-Control": "public, s-maxage=20, stale-while-revalidate=40",
       },
     }
   );
+}
+
+function num(v: string | null, fallback: number): number {
+  if (v == null) return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
