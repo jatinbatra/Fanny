@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { Map as LeafletMap, LayerGroup, Marker, Circle } from "leaflet";
+import type { Map as LeafletMap, LayerGroup, Marker } from "leaflet";
 import { Flight, TurbulenceEvent, TurbulenceSeverity } from "@/lib/types";
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   trackedFlights: string[];
   onFlightSelect: (flight: Flight | null) => void;
   selectedFlight: Flight | null;
+  onViewportChange?: (v: { lat: number; lon: number; distNm: number }) => void;
 }
 
 const SEVERITY_COLORS: Record<TurbulenceSeverity, string> = {
@@ -32,12 +33,15 @@ export default function RadarMap({
   trackedFlights,
   onFlightSelect,
   selectedFlight,
+  onViewportChange,
 }: Props) {
   const mapRef = useRef<LeafletMap | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const flightLayerRef = useRef<LayerGroup | null>(null);
   const turbLayerRef = useRef<LayerGroup | null>(null);
   const markersRef = useRef<Map<string, Marker>>(new Map());
+  const viewportCbRef = useRef(onViewportChange);
+  viewportCbRef.current = onViewportChange;
   const [mapReady, setMapReady] = useState(false);
 
   // Init map once
@@ -67,13 +71,34 @@ export default function RadarMap({
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
       L.control
-        .attribution({ prefix: "© OpenStreetMap | CartoDB | OpenSky" })
+        .attribution({ prefix: "CartoDB | adsb.lol | Open-Meteo | AWC" })
         .addTo(map);
 
       flightLayerRef.current = L.layerGroup().addTo(map);
       turbLayerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
       setMapReady(true);
+
+      // Report viewport (centre + radius to a corner, capped at the API's
+      // 250 nm limit) so the parent can fetch real traffic for what's on
+      // screen. Debounced so panning doesn't spam the API.
+      let t: ReturnType<typeof setTimeout> | null = null;
+      const report = () => {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => {
+          const c = map.getCenter();
+          const b = map.getBounds();
+          const cornerNm =
+            (map.distance(c, b.getNorthEast()) / 1852) || 200;
+          viewportCbRef.current?.({
+            lat: c.lat,
+            lon: c.lng,
+            distNm: Math.min(250, Math.max(40, cornerNm)),
+          });
+        }, 600);
+      };
+      map.on("moveend zoomend", report);
+      report();
     }
 
     initMap();

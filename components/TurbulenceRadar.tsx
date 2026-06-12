@@ -24,7 +24,13 @@ const RadarMap = dynamic(() => import("./RadarMap"), {
   ),
 });
 
-const REFRESH_INTERVAL = 30000; // 30s — respects OpenSky anonymous rate limits
+const REFRESH_INTERVAL = 20000; // 20s — keeps live ADS-B fresh, polite to free APIs
+
+interface Viewport {
+  lat: number;
+  lon: number;
+  distNm: number;
+}
 
 export default function TurbulenceRadar() {
   const [flights, setFlights] = useState<Flight[]>([]);
@@ -38,11 +44,16 @@ export default function TurbulenceRadar() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const prevTurbStatusRef = useRef<Map<string, string>>(new Map());
+  const viewportRef = useRef<Viewport | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       setError(null);
-      const res = await fetch("/api/flights");
+      const v = viewportRef.current;
+      const qs = v
+        ? `?lat=${v.lat.toFixed(3)}&lon=${v.lon.toFixed(3)}&dist=${Math.round(v.distNm)}`
+        : "";
+      const res = await fetch(`/api/flights${qs}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -104,12 +115,22 @@ export default function TurbulenceRadar() {
     }
   }, []);
 
-  // Initial + interval fetch
+  // Initial fetch (default region) + interval refresh. The map refines the
+  // viewport within ~1s and refetches for what's actually on screen.
   useEffect(() => {
     fetchData();
     const timer = setInterval(fetchData, REFRESH_INTERVAL);
     return () => clearInterval(timer);
   }, [fetchData]);
+
+  // Map reports its centre/zoom; refetch for the new view (debounced in map).
+  const handleViewportChange = useCallback(
+    (v: Viewport) => {
+      viewportRef.current = v;
+      fetchData();
+    },
+    [fetchData]
+  );
 
   const handleTrack = useCallback((flight: Flight) => {
     setTrackedFlights((prev) => {
@@ -195,8 +216,8 @@ export default function TurbulenceRadar() {
           {dataSource !== "live" && (
             <span className="hidden sm:inline text-[10px] font-mono text-amber-500 border border-amber-800 px-2 py-0.5 rounded">
               {dataSource === "simulated"
-                ? "DEMO MODE — live feeds unreachable"
-                : "PARTIAL LIVE — some data simulated"}
+                ? "DEMO — live feeds unreachable, retrying"
+                : "LIVE FLIGHTS — turbulence model active"}
             </span>
           )}
           <button
@@ -220,6 +241,7 @@ export default function TurbulenceRadar() {
             trackedFlights={trackedFlights.map((t) => t.icao24)}
             onFlightSelect={setSelectedFlight}
             selectedFlight={selectedFlight}
+            onViewportChange={handleViewportChange}
           />
 
           {/* Notification overlay on map */}
